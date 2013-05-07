@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<block id="14160206443" level="17"><road id="43" name="大学城东三路"><triangles material="road" type="strip"><node x="31.6651753932" y="0" z="2889.87404647" /><node x="-31.6651754528" y="0" z="3058.36519367" /><node x="253.463983849" y="0" z="2973.23477542" /><node x="190.137796387" y="0" z="3141.72748737" /></triangles></road></block>

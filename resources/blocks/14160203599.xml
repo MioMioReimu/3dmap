@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<block id="14160203599" level="17"><road id="219" name="中环"><triangles material="road" type="strip"><node x="3078.77550164" y="0" z="-134.971413147" /><node x="2840.59307042" y="0" z="134.971413139" /><node x="3176.5729966" y="0" z="-48.6794697605" /><node x="2938.38926615" y="0" z="221.262210149" /></triangles></road></block>
