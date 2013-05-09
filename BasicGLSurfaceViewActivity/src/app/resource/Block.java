@@ -13,7 +13,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import android.R.integer;
 import app.core.AABB2D;
 import app.core.Float3;
 import app.core.Int2;
@@ -58,26 +57,23 @@ public class Block {
 			DocumentBuilder xmlBuilder=xmlFactory.newDocumentBuilder();
 			Document doc=xmlBuilder.parse(new File(path));
 			Element root=(Element)doc.getDocumentElement();
-			NodeList ndList=root.getChildNodes();
+			NodeList ndList=root.getElementsByTagName("road");
 			for(int i=0;i<ndList.getLength();i++) {
 				Element element=(Element)(ndList.item(i));
-				String tag=element.getTagName();
-				if(tag.equals("road"))
-					block.elements.put(element.getAttribute("id"), new Road(element, block));
-				//TODO:如果还需要其他的类型在这里添加构造
+				block.elements.put(element.getAttribute("id"), new Road(element, block));
 			}
 			return block;
 		} catch (ParserConfigurationException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			//e.printStackTrace();
 			return null;
 		} catch (SAXException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			//e.printStackTrace();
 			return null;
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			//e.printStackTrace();
 			return null;
 		}
 	}

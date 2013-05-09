@@ -4,7 +4,6 @@ import java.util.Iterator;
 
 import app.core.AABB2D;
 import app.core.Float3;
-import app.core.Int3;
 
 
 public class Road extends Drawable {
@@ -48,8 +47,8 @@ public class Road extends Drawable {
 		while(meshIt.hasNext()){
 			Mesh m=meshIt.next();
 			float marray[]=m.vertexData.array();
-			int vtxSize=m.getVertexSize();
-			for(int i=0;i<marray.length;i+=vtxSize){
+			int stride=m.getStrideSize();
+			for(int i=0;i<marray.length;i+=stride){
 				if(marray[i]>maxx)
 					maxx=marray[i];
 				if(marray[i]<minx)

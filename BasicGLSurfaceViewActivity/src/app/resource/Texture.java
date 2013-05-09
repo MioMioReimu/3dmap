@@ -4,12 +4,13 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
+import app.resource.Shader.SamplerType;
 
 public class Texture {
 	public String name;
 	public int id;
 	public String path;
-	public int type;
+	public SamplerType type;
 	public Bitmap bmp;
 	public static int DIFFUSE=0;
 	public void loadTexture()
@@ -24,7 +25,7 @@ public class Texture {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, id);
 
         GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,
-                GLES20.GL_NEAREST);
+                GLES20.GL_LINEAR);
         GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D,
                 GLES20.GL_TEXTURE_MAG_FILTER,
                 GLES20.GL_LINEAR);

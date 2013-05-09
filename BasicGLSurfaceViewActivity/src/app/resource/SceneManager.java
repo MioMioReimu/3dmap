@@ -8,8 +8,6 @@ import java.util.Iterator;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-import android.R.anim;
-import android.graphics.Matrix;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView.Renderer;
 import app.core.AABB2D;
@@ -26,14 +24,15 @@ public class SceneManager implements Renderer{
 	/**采用双缓存机制,防止在渲染线程和更新线程出现冲突*/
 	ArrayList<Block>potentialBlocks;
 	ArrayList<Block>tmppotentialBlocks;
-	AABB2D visibleRegion =new AABB2D(0,0,15000,15000);
+	AABB2D visibleRegion =new AABB2D(0,0,4500,4500);
 	AABB2D CachedRegion =new AABB2D(0,0,50000,50000);
-	private static String blockpath="/sdcard/blocks/";
+	private static String blockpath="/sdcard/map/blocks/";
 	//ArrayList<Mesh>renderQueue;
-	private Material material;
-	private Shader shader;
+	private MaterialLib matlib;
+	private ShaderLib shaderlib;
 	private Mesh testMesh;
-	
+	private float[] viewMatrix=new float[16];
+	private float[] proMatrix=new float[16];
 	public SceneManager(){
 		Int2 xzid=Block.calculatexzid(14160203733L);
 		referPoint=new Int3((int)Block.calculatexybyid(xzid.x),0,(int)Block.calculatexybyid(xzid.y));
@@ -42,7 +41,12 @@ public class SceneManager implements Renderer{
 		this.blockList=new HashMap<Long, Block>();
 		this.potentialBlocks=new ArrayList<Block>();
 		this.tmppotentialBlocks=new ArrayList<Block>();
-		this.testMesh=new Mesh(Mesh.TRILIST, this.m);
+		this.testMesh=new Mesh(Mesh.TRILIST|Mesh.HASUV, m);
+	}
+	public void renderInit(){
+		this.matlib=new MaterialLib();
+		this.shaderlib=new ShaderLib();
+		this.matlib.Init(shaderlib);
 	}
 	
 	/**
@@ -105,6 +109,8 @@ public class SceneManager implements Renderer{
 	public void Draw(){
 		Iterator<Block>it=this.potentialBlocks.iterator();
 		float[] vpMatrix=Matrix4f.multiply( camera.viewMatrix4f,camera.projectionMatrix4f).getArray();
+		//float[] vpMatrix=new float[16];
+		//android.opengl.Matrix.multiplyMM(vpMatrix, 0, proMatrix, 0, viewMatrix, 0);
 		while(it.hasNext()){
 			Block i=it.next();
 			float[] mMatrix=i.getBlockMatrix().getArray();
@@ -114,12 +120,12 @@ public class SceneManager implements Renderer{
 			while(eleIt.hasNext()){
 				ArrayList<Mesh>meshes=eleIt.next().meshes;
 				for(int j=0;j<meshes.size();j++){
-					
-					meshes.get(j).Render(this.shader, this.material, mMatrix, vpMatrix);
+					meshes.get(j).Render(this.matlib, mMatrix, vpMatrix);
 				}
 			}
 		}
-		this.testMesh.Render(this.shader, this.material, new Matrix4f().getArray(), vpMatrix);
+		testMesh.setMaterial(matlib.getMaterial("road"));
+		testMesh.Render(matlib, new Matrix4f().getArray(), vpMatrix);
 	}
 	@Override
 	public void onDrawFrame(GL10 gl) {
@@ -127,22 +133,21 @@ public class SceneManager implements Renderer{
 	     GLES20.glClear( GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
 	     updatePotentialBlocks();
 	     removeOutBoundBlocks();
-		this.Draw();
+		 this.Draw();
 	}
 
 	@Override
 	public void onSurfaceChanged(GL10 gl, int width, int height) {
 		GLES20.glViewport(0, 0, width, height);
-		this.camera.persective(60, (float)width/(float)height, 1000, 200000);
-		android.opengl.Matrix.perspectiveM(proMatrix, 0, 60, (float)width/(float)height, 1000, 20000);
+		this.camera.persective(120, (float)width/(float)height, 100, 2000);
+		//android.opengl.Matrix.perspectiveM(proMatrix, 0, 60, (float)width/(float)height, 1000, 200000);
 	}
 
 	@Override
 	public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-		this.shader=new Shader(vtxSrc, fragSrc, 0, false);
-		this.camera.lookAt(0, 15000, 0, 0, 0, 0, 1, 0, 0);
-		//android.opengl.Matrix.setLookAtM(this.viewMatrix, 0, 15000, 0, 0, 0, 0, 1, 0, 0);
-		
+		this.camera.lookAt(0, 600, 0, 0, 0, 0, 1, 0, 0);
+		//android.opengl.Matrix.setLookAtM(this.viewMatrix,0, 0, 15000, 0, 0, 0, 0, 1, 0, 0);
+		renderInit();
 	}
 	
 	public void loadInBoundBlocks(){
@@ -152,24 +157,9 @@ public class SceneManager implements Renderer{
 		
 	}
 	
-	
-	private final String vtxSrc=
-			"uniform mat4 vpMatrix;\n"+
-			"attribute vec4 vertex;\n"+
-			"uniform mat4 mMatrix;\n"+
-			"void main(){\n"+
-			"	gl_Position=vpMatrix*mMatrix*vertex;\n"+
-			"}\n";
-	private final String fragSrc=
-			"precision mediump float;\n"+
-			"void main(){\n"+
-			"	gl_FragColor=vec4(0.2,0.4,0.8,1.0);\n"+
-			"}\n";
-	private float m[]={-100,0,100,100,0,100,100,0,-100,
-			-100,0,100,100,0,-100,-100,0,-100,
-			100,0,-100,100,0,100,-100,0,100,
-			-100,0,-100,100,0,-100,-100,0,100
+	private float m[]={-100,0,100,0,1,100,0,100,1,1,100,0,-100,1,0
+			-100,0,100,0,1,100,0,-100,1,0,-100,0,-100,0,0,
+			100,0,-100,1,0,100,0,100,1,1,-100,0,100,0,1,
+			-100,0,-100,0,0,100,0,-100,1,0,-100,0,100,0,1,
 			};
-	private float viewMatrix[]=new float[16];
-	private float proMatrix[]=new float[16];
 }

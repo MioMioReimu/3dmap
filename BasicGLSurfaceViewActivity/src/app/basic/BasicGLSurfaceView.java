@@ -19,7 +19,6 @@ package app.basic;
 import android.content.Context;
 import android.opengl.GLSurfaceView;
 
-import android.opengl.GLES20;
 import app.resource.SceneManager;
 
 class BasicGLSurfaceView extends GLSurfaceView {

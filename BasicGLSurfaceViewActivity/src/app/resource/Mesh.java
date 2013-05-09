@@ -2,14 +2,13 @@ package app.resource;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-
-import android.R.integer;
 import android.opengl.GLES20;
 import android.util.Log;
 
 public class Mesh {
 	int type;
 	String materialName;
+	Material material=null;
 	FloatBuffer vertexData;
 	static final int TRIFAN = 0x00000006;
 	static final int TRISTRIP = 0x00000005;
@@ -19,40 +18,46 @@ public class Mesh {
 	static final int HASUV = 0x00000010;
 	static final int HASNORMAL = 0x00000020;
 	static final int USEHARDWAREBUFFER=0x00000040;
+	private int strideSize;
 	private int vertexSize;
-	private int triSize;
+	private int hardwareBufferid=0;
 	
-	IntBuffer hwVtxBuffID=IntBuffer.allocate(1);
 	
 	public Mesh(int type, float buffer[]) {
 		this.type = type;
 		this.vertexData = FloatBuffer.wrap(buffer);
 		
-		calculateVertexSize();
-		this.calculateTriSize();
+		calculateStrideSize();
+		this.calculateVertexSize();
 	}
 
 	public Mesh(int type, FloatBuffer buf) {
 		this.type = type;
 		this.vertexData = buf;
 		
-		calculateVertexSize();
-		this.calculateTriSize();
+		calculateStrideSize();
+		this.calculateVertexSize();
+	}
+	private void calculateStrideSize(){
+		this.strideSize=3;
+		if((type&HASUV)==HASUV)
+			strideSize+=2;
+		if((type&HASNORMAL)==HASNORMAL)
+			strideSize+=3;
 	}
 	private void calculateVertexSize(){
-		this.vertexSize=3;
-		if((type&HASUV)==HASUV)
-			vertexSize+=2;
-		if((type&HASNORMAL)==HASNORMAL)
-			vertexSize+=3;
+		this.vertexSize=vertexData.capacity()/this.strideSize;
 	}
-	private void calculateTriSize(){
-		this.triSize=vertexData.capacity()/this.vertexSize;
+	public int getStrideSize(){
+		return strideSize;
 	}
-	public int getVertexSize(){
-		return vertexSize;
+	public void setMaterial(Material m){
+		this.material=m;
 	}
-	
+	public void setMaterial(MaterialLib mlib){
+		
+		this.material=mlib.getMaterial(materialName);
+	}
 	public Mesh(org.w3c.dom.Element e) {
 		String type = e.getAttribute("type");
 		if (type.equals("list")) {
@@ -78,7 +83,7 @@ public class Mesh {
 			NdSize+=3;
 			this.type|=Mesh.HASNORMAL;
 		}
-		this.vertexSize=NdSize;
+		this.strideSize=NdSize;
 		float buffer[]=new float[ndList.getLength()*NdSize];
 		if(NdSize==5){
 			int k=0;
@@ -114,7 +119,7 @@ public class Mesh {
 		}
 		this.vertexData=FloatBuffer.wrap(buffer);
 		
-		this.calculateTriSize();
+		this.calculateVertexSize();
 	}
 	
 	/**
@@ -122,10 +127,10 @@ public class Mesh {
 	 * 把该物体的顶点数据送入显卡顶点缓冲区
 	 */
 	public boolean InitHardwareBuffer(){
-		
-		GLES20.glGenBuffers(1, this.hwVtxBuffID);
+		IntBuffer hwVtxBuffID=IntBuffer.allocate(1);
+		GLES20.glGenBuffers(1, hwVtxBuffID);
 		assert(hwVtxBuffID.get(0)!=0);
-		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, this.hwVtxBuffID.get(0));
+		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, hwVtxBuffID.get(0));
 		this.vertexData.position(0);
 		//第一个参数 类型 顶点缓冲区或者索引缓冲区
 		//第二个参数 复制到缓冲区的Buffer的字节数，注意是字节数
@@ -134,52 +139,63 @@ public class Mesh {
 		GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, this.vertexData.capacity()*4, this.vertexData, GLES20.GL_STATIC_DRAW);
 		if(this.checkGLError("Allocate VBO ")){
 			this.type|=Mesh.USEHARDWAREBUFFER;
+			this.hardwareBufferid=hwVtxBuffID.get(0);
 			return true;
 		}
-		this.hwVtxBuffID.put(0, 0);
+		this.hardwareBufferid=0;
 		return false;
 	}
 	
-	public void Render(Shader s,Material m,float mMatrix[],float[] vpMatrix){
-		GLES20.glUseProgram(s.handle);
+	public void Render(MaterialLib mlib,float mMatrix[],float[] vpMatrix){
+		if(this.material==null){
+			this.setMaterial(mlib.getMaterial(materialName));
+		}
 		if((this.type&Mesh.USEHARDWAREBUFFER)==Mesh.USEHARDWAREBUFFER){
-			this.RenderWithHardwareBuffer(s, m, mMatrix, vpMatrix);
+			this.RenderWithHardwareBuffer( mMatrix, vpMatrix);
 		}else {
 			if(this.InitHardwareBuffer()){
-				this.RenderWithHardwareBuffer(s, m, mMatrix, vpMatrix);
+				this.RenderWithHardwareBuffer(mMatrix, vpMatrix);
 			}else{
-				RenderWithLocalBuffer(s,m,mMatrix,vpMatrix);
+				RenderWithLocalBuffer(mMatrix,vpMatrix);
 			}
 		}
 	}
-	private void RenderWithHardwareBuffer(Shader s,Material m,float []mMatrix,float []vpMatrix){
-		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, this.hwVtxBuffID.get(0));
-		
-		GLES20.glVertexAttribPointer(s.vertexHandle, 3, GLES20.GL_FLOAT, false, this.vertexSize*4, 0);
-		GLES20.glEnableVertexAttribArray(s.vertexHandle);
-		if((this.type&Mesh.HASUV)==Mesh.HASUV){
-			GLES20.glVertexAttribPointer(s.uvHandle[0], 2, GLES20.GL_FLOAT, false, this.vertexSize*4, 12);
+	private void RenderWithHardwareBuffer(float []mMatrix,float []vpMatrix){
+		Shader s=this.material.shader;
+		s.useShader();
+		s.bindTextures(material.getTextures());
+		checkGLError("use program");
+		s.setVertices(hardwareBufferid,this.strideSize*4 , 0);
+		if((this.type&HASUV)==HASUV){
+			s.setTexCoord(hardwareBufferid, this.strideSize*4, 12);
 		}
-		GLES20.glUniformMatrix4fv(s.modelMatrixHandle, 1, false, mMatrix,0);
-		GLES20.glUniformMatrix4fv(s.ViewProjectionMatrixHandle, 1, false, vpMatrix,0);
-		//Log.e("Mesh:",String.valueOf(this.type&Mesh.TRIMODEANDER));
-		GLES20.glDrawArrays(this.type&Mesh.TRIMODEANDER, 0, this.triSize);
+		if((this.type&HASNORMAL)==HASNORMAL){
+			//
+		}
+		
+		s.setVPMatrix(vpMatrix);
+		s.setModelMatrix(mMatrix);
+		GLES20.glDrawArrays(this.type&TRIMODEANDER, 0, this.vertexSize);
 		checkGLError("DrawTriangles");
 	}
-	private void RenderWithLocalBuffer(Shader s,Material m,float [] mMatrix,float [] vpMatrix){
-		GLES20.glEnableVertexAttribArray(s.vertexHandle);
-		int offset=0;
-		this.vertexData.position(offset);
-		GLES20.glVertexAttribPointer(s.vertexHandle, 3, GLES20.GL_FLOAT, false, this.vertexSize*4, this.vertexData);
-		offset+=3;
-		if((this.type&Mesh.HASUV)==Mesh.HASUV){
-			this.vertexData.position(offset);
-			GLES20.glVertexAttribPointer(s.uvHandle[0], 2, GLES20.GL_FLOAT, false, this.vertexSize*4, this.vertexData);
-			offset+=2;
+	private void RenderWithLocalBuffer(float [] mMatrix,float [] vpMatrix){
+		Shader s=this.material.shader;
+		GLES20.glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+        GLES20.glClear( GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+		s.useShader();
+		//s.bindTextures(material.getTextures());
+		s.setVertices(this.vertexData,this.strideSize*4 , 0);
+		if((this.type&HASUV)==HASUV){
+			s.setTexCoord(this.vertexData, this.strideSize*4, 12);
 		}
-		GLES20.glUniformMatrix4fv(s.modelMatrixHandle, 1, false, mMatrix,0);
-		GLES20.glUniformMatrix4fv(s.ViewProjectionMatrixHandle, 1, false, vpMatrix,0);
-		GLES20.glDrawArrays(this.type&Mesh.TRIMODEANDER, 0, this.triSize);
+		if((this.type&HASNORMAL)==HASNORMAL){
+			//
+		}
+		
+		s.setVPMatrix(vpMatrix);
+		s.setModelMatrix(mMatrix);
+		GLES20.glDrawArrays(this.type&TRIMODEANDER, 0, this.vertexSize);
+		checkGLError("DrawTriangles");
 	}
 	private boolean checkGLError(String op){
 		int error;

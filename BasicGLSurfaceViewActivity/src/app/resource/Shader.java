@@ -1,16 +1,30 @@
 package app.resource;
 
 import java.nio.FloatBuffer;
-import java.util.HashMap;
 
 import android.opengl.GLES20;
 import android.util.Log;
 
+/**
+ * shader编写须知:
+ * 顶点位置变量名必须设置为 aPosition
+ * 纹理坐标变量名必须设置为aTextureCoord
+ * 顶点颜色变量名必须设置为aColor
+ * 顶点法线必须设置为             aNormalCoord
+ * 模型矩阵                                   uMMatrix
+ * 视图矩阵                                   uVMatrix
+ * 投影矩阵                                   uPMatrix
+ * 总矩阵                                        uMVPMatrix
+ * 视图投影矩阵                          uVPMatrix
+ * 
+ * @author tlm
+ *
+ */
 public class Shader {
 	public	int programHandle;
 	public int vshaderHandle;
 	public int fshaderHandle;
-	
+	public String name;
 	public int aPositionHandle;
 	public int aTextureCoordHandle;
 	public int aColorHandle;
@@ -21,10 +35,11 @@ public class Shader {
 	public int uMVPMatrixHandle;
 	public int uVPMatrixHandle;
 	public int uCameraPositionHandle;
-	public int textureHandle[];
-	public int textureNum;
+	public int samplerHandle[];
+	public int samplerNum;
+	public SamplerType[] samplertype;
 	
-	Shader(String vtxsrc,String fragsrc){
+	Shader(String vtxsrc,String fragsrc,String name){
 		this.vshaderHandle=this.createShader(vtxsrc, GLES20.GL_VERTEX_SHADER);
 		assert(vshaderHandle!=0);
 		this.fshaderHandle=this.createShader(fragsrc, GLES20.GL_FRAGMENT_SHADER);
@@ -45,8 +60,9 @@ public class Shader {
 		
 		assert(this.programHandle!=0);
 		setDefaultHandles();
+		this.name=name;
 	}
-	private void setDefaultHandles()
+	public void setDefaultHandles()
 	{
 		this.aPositionHandle=getAttribHandle("aPosition");
 		this.aTextureCoordHandle=getAttribHandle("aTextureCoord");
@@ -90,15 +106,26 @@ public class Shader {
 		return shader;
 	}
 	
-	public void setTextureNum(int num,String []names)
+	public void setTextureNum(int num,String []names,String[]type)
 	{
-		this.textureNum=num;
+		this.samplerNum=num;
+		this.samplerHandle=new int[num];
+		this.samplertype=new SamplerType[num];
 		for(int i=0;i<num;i++)
 		{
-			GLES20.glGetUniformLocation(this.programHandle, names[i]);
+			this.samplerHandle[i]=GLES20.glGetUniformLocation(this.programHandle, names[i]);
+			if(type[i].equals("sampler2D")){
+				this.samplertype[i]=SamplerType.sampler2D;
+			}
+			//TODO:增加其他的类型的sampler
 		}
 	}
 	
+	
+	public void useShader()
+	{
+		GLES20.glUseProgram(programHandle);
+	}
 	public void setVertices(int bufferid,int stride,int offset){
 		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, bufferid);
 		GLES20.glEnableVertexAttribArray(this.aPositionHandle);
@@ -140,17 +167,21 @@ public class Shader {
 	 * @param ts
 	 */
 	public void bindTextures(Texture[]ts){
-		for(int i=0;i<this.textureNum;i++) {
+		for(int i=0;i<this.samplerNum;i++) {
 			GLES20.glActiveTexture(GLES20.GL_TEXTURE0+i);
 			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ts[i].id);
-			GLES20.glUniform1i(textureHandle[i], i);
+			GLES20.glUniform1i(samplerHandle[i], i);
 		}
 	}
 	public void unbindTextures(Texture[]ts){
-		for(int i=0;i<this.textureNum;i++){
+		for(int i=0;i<this.samplerNum;i++){
 			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
 		}
 	}
 	public static int VAR_ATTRIB=0;
 	public static int VAR_UNIFORM=1;
+	public enum SamplerType{
+		sampler2D,
+		//Sampler3D,
+	};
 }
